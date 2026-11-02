@@ -257,7 +257,7 @@ button.addr-bkt:hover{background:var(--s2)}
 
 /* Column header */
 .cols{
-  display:grid;grid-template-columns:32px 1fr 92px 122px 78px;align-items:center;
+  display:grid;grid-template-columns:32px 1fr 92px 122px 104px;align-items:center;
   padding:0 12px;height:30px;flex:none;
   border-bottom:1px solid var(--line);
   font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
@@ -286,7 +286,7 @@ button.addr-bkt:hover{background:var(--s2)}
 .list,.tiles,.cols,.status,.selbar{user-select:none}
 .list{padding:4px 6px}
 .row{
-  display:grid;grid-template-columns:32px 1fr 92px 122px 78px;align-items:center;
+  display:grid;grid-template-columns:32px 1fr 92px 122px 104px;align-items:center;
   height:38px;padding:0 6px;border-radius:var(--r);
   position:relative;
 }
@@ -369,7 +369,7 @@ button.addr-bkt:hover{background:var(--s2)}
 .state-a{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;justify-content:center}
 
 /* Skeleton */
-.skel-row{display:grid;grid-template-columns:32px 1fr 92px 122px 78px;align-items:center;
+.skel-row{display:grid;grid-template-columns:32px 1fr 92px 122px 104px;align-items:center;
   height:38px;padding:0 6px;gap:9px}
 .sk{height:9px;border-radius:3px;background:var(--s2);position:relative;overflow:hidden}
 .sk::after{
@@ -631,7 +631,7 @@ kbd{
   .brand-t{display:none}
 }
 @media (max-width:760px){
-  .cols,.row,.skel-row{grid-template-columns:32px 1fr 84px 68px}
+  .cols,.row,.skel-row{grid-template-columns:32px 1fr 84px 100px}
   .cell-d,.col-d{display:none}
   .addr-hint{display:none}
   /* Wrap the filter to a row of its own rather than squeezing the actions
@@ -642,7 +642,7 @@ kbd{
   .divide{display:none}
 }
 @media (max-width:560px){
-  .cols,.row,.skel-row{grid-template-columns:32px 1fr 68px}
+  .cols,.row,.skel-row{grid-template-columns:32px 1fr 100px}
   .cell-s,.col-s{display:none}
 
   /* The status bar carries the only always-visible controls for a partial
@@ -906,6 +906,7 @@ kbd{
         <div class="selbar-c" id="selbar-c"></div>
         <div class="divide"></div>
         <button class="btn btn-g btn-sm" id="b-dl-sel" onclick="downloadSelected()"><svg class="ic ic-sm"><use href="#i-down" id="ic-dl-sel"/></svg> Download</button>
+        <button class="btn btn-g btn-sm hidden" id="b-zip-sel" onclick="zipSelected()" title="Download as zip"><svg class="ic ic-sm"><use href="#i-zip"/></svg> Zip</button>
         <button class="btn btn-d btn-sm" onclick="deleteSelected()"><svg class="ic ic-sm"><use href="#i-trash"/></svg> Delete</button>
         <button class="ibtn" onclick="clearSel()" aria-label="Clear selection"><svg class="ic ic-sm"><use href="#i-x"/></svg></button>
       </div>
@@ -2109,6 +2110,7 @@ function listHTML() {
       <div class="cell-a">${dir ? `
         <button class="abtn" data-a="zip" aria-label="Download as zip"><svg class="ic ic-sm"><use href="#i-zip"/></svg></button>` : `
         <button class="abtn" data-a="dl" aria-label="Download"><svg class="ic ic-sm"><use href="#i-down"/></svg></button>
+        <button class="abtn" data-a="zip" aria-label="Download as zip" title="Download as zip"><svg class="ic ic-sm"><use href="#i-zip"/></svg></button>
         <button class="abtn" data-a="sh" aria-label="Share link"><svg class="ic ic-sm"><use href="#i-link"/></svg></button>`}
         <button class="abtn rm" data-a="rm" aria-label="Delete"><svg class="ic ic-sm"><use href="#i-trash"/></svg></button>
       </div>
@@ -2247,6 +2249,9 @@ function updateSelUI() {
     const zip = n > 1 || [...selKeys].some(k => (items.find(i => i.key === k) || {}).type === 'folder');
     el('b-dl-sel').lastChild.textContent = zip ? ' Download as zip' : ' Download';
     el('ic-dl-sel').setAttribute('href', zip ? '#i-zip' : '#i-down');
+    // A single file downloads as itself, so the archive is offered alongside
+    // it. When the main button already zips, a second one would be redundant.
+    el('b-zip-sel').classList.toggle('hidden', zip);
   }
   const all = items.length > 0 && n === items.length;
   el('cbox-all').classList.toggle('on', all);
@@ -3092,6 +3097,11 @@ function zipEntryName(key, taken) {
 
 function zipSuggestedName(picks) {
   if (picks.length === 1 && picks[0].type === 'folder') return picks[0].name + '.zip';
+  // One file: name the archive after the file, minus its extension.
+  if (picks.length === 1) {
+    const fn = dlName(picks[0]), dot = fn.lastIndexOf('.');
+    return (dot > 0 ? fn.slice(0, dot) : fn) + '.zip';
+  }
   const seg = prefix.split('/').filter(Boolean).pop();
   return (seg || bucket || 'objects') + '.zip';
 }
