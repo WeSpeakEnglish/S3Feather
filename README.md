@@ -211,6 +211,15 @@ Each row shows the name on top and the endpoint host (or the region) underneath.
 
 ---
 
+## Thumbrella thumbnails (optional)
+
+Optional thumbnails can be generated and cached by setting a Thumbrella
+connection string. This is usually a url to a self hosted server or an account
+token for the free Cloud service. Leave empty to ignore thumbnails. Read more
+at https://thumbrella.dev
+
+---
+
 ## S3-compatible services
 
 | Service | Endpoint format |

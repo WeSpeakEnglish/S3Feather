@@ -311,6 +311,7 @@ button.addr-bkt:hover{background:var(--s2)}
 .gl{color:var(--ink2);flex:none}
 .gl.dir{color:var(--amber)}
 .gl.media{color:var(--cyan)}
+tbr-thumb.gl{width:30px;height:24px;border-radius:2px;--tbr-bg:var(--s2);filter:contrast(1.2)}
 .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mo);font-size:12.5px}
 .nm.dir{color:var(--ink);font-weight:500}
 .cell-s,.cell-d{
@@ -342,7 +343,8 @@ button.addr-bkt:hover{background:var(--s2)}
 /* The glyph sits underneath the thumbnail, so an image that fails to load —
    blocked by CORS, or simply not really an image — reveals it instead of a
    blank box. */
-.tile-p img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.tile-p img,.tile-p tbr-thumb{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.tile-p tbr-thumb{--tbr-bg:var(--bg)}
 .tile-p .ic{width:26px;height:26px}
 .tile-p .ic.dir{color:var(--amber)}
 .tile-b{padding:7px 9px}
@@ -444,6 +446,9 @@ button.addr-bkt:hover{background:var(--s2)}
 }
 .in:focus{border-color:var(--amberB);box-shadow:0 0 0 3px var(--amberD)}
 .in::placeholder{color:var(--ink3)}
+/* Truncate the visible Thumbrella token while unfocused (cosmetic, for screen sharing) */
+#tbr-connect{transition:border-color var(--dur),box-shadow var(--dur),width var(--dur)}
+#tbr-connect:not(:focus):not(:placeholder-shown){width:70%}
 select.in{cursor:pointer}
 select.in option{background:var(--s2)}
 textarea.in{height:auto;min-height:64px;padding:8px 10px;resize:vertical;line-height:1.55;font-size:11.5px}
@@ -451,6 +456,8 @@ textarea.in{height:auto;min-height:64px;padding:8px 10px;resize:vertical;line-he
 .hint b{color:var(--ink2);font-weight:500}
 .lnk{color:var(--cyan);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 .lnk:hover{color:var(--ink)}
+.side a{color:inherit}
+.side a:hover{color:var(--cyan)}
 .err{
   display:flex;align-items:flex-start;gap:7px;margin-top:10px;padding:8px 10px;
   background:var(--redD);border:1px solid rgba(255,107,107,.22);
@@ -767,6 +774,16 @@ kbd{
           <button class="btn btn-s btn-sm btn-blk" onclick="showAddConn()">
             <svg class="ic ic-sm"><use href="#i-plus"/></svg> Add connection
           </button>
+        </div>
+      </div>
+
+      <div class="sect">
+        <div class="sect-h"><div class="lbl">Thumbnails</div></div>
+        <p class="note">Fast online thumbnails with <a href="https://thumbrella.dev" target="_blank" rel="noopener noreferrer">Thumbrella</a>. Self hosted url, or <a href="https://accounts.thumbrella.dev/sign-up" target="_blank" rel="noopener noreferrer">get a free token</a>.</p>
+        <div class="fld" style="margin:10px 0 0">
+          <input class="in" id="tbr-connect" placeholder="Thumbrella connect string" style="font-size:smaller"
+                 onchange="configureThumbrella()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+          <div class="hint" id="tbr-fail" style="color:var(--red)"></div>
         </div>
       </div>
 
@@ -1343,6 +1360,25 @@ let lastFocus = null;
 /* ═══════════════════════════════════════════════════════════════════
    BOOT
    ═══════════════════════════════════════════════════════════════════ */
+   
+/* Activate or update Thumbrella configuration with private connect string */
+let TBR_CLIENT = null;
+async function configureThumbrella() {
+  const connect = el('tbr-connect').value.trim();
+  if (connect !== TBR_CLIENT?.connect) {
+    try { sessionStorage.setItem('s3b-tbr', connect); } catch {}
+    try {
+      const t = await import('https://js.thumbrella.dev/2.1/tbr.js');
+      TBR_CLIENT = await t.tbrSetup(connect).verify();
+      el('tbr-fail').textContent = '';
+    } catch (e) {
+      TBR_CLIENT = null;
+      el('tbr-fail').textContent = connect ? (e.message || 'Thumbrella failed.') : '';
+    }
+    if (S3) render();
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   showOriginNotice();
 
@@ -1351,6 +1387,9 @@ document.addEventListener('DOMContentLoaded', () => {
   syncSort();
   buildAddr();
   updateChrome();
+
+  try {el('tbr-connect').value = sessionStorage.getItem('s3b-tbr');} catch {}
+  configureThumbrella();  
 
   el('mkdir-name').addEventListener('input', mkdirPrev);
   setupDrop();
@@ -2102,7 +2141,8 @@ function listHTML() {
       <div class="cell-c"><span class="cbox${selKeys.has(it.key) ? ' on' : ''}" data-sel="1">
         <svg class="ic ic-sm"><use href="#i-check"/></svg></span></div>
       <div class="cell-n">
-        <svg class="ic gl ${gl.c}"><use href="#${gl.s}"/></svg>
+        ${TBR_CLIENT && !dir ? `<tbr-thumb class="gl" src="${x(thumbURL(it))}"></tbr-thumb>`
+          : `<svg class="ic gl ${gl.c}"><use href="#${gl.s}"/></svg>`}
         <span class="nm${dir ? ' dir' : ''}">${x(it.name)}${dir ? '/' : ''}</span>
       </div>
       <div class="cell-s col-s">${dir ? '—' : fmtSize(it.size)}</div>
@@ -2122,7 +2162,7 @@ function gridHTML() {
   return `<div class="tiles" role="presentation">` + items.map((it, i) => {
     const gl = glyph(it);
     const dir = it.type === 'folder';
-    const thumb = !dir && isImage(it.name) ? thumbURL(it.key) : null;
+    const thumb = !dir && (TBR_CLIENT || isImage(it.name)) ? thumbURL(it) : null;
     const on = selKeys.has(it.key);
     return `<div class="tile${on ? ' sel' : ''}" data-i="${i}"
       role="option" aria-selected="${on}" aria-label="${x(it.name)}${dir ? ' prefix' : ''}">
@@ -2130,7 +2170,8 @@ function gridHTML() {
         <svg class="ic ic-sm"><use href="#i-check"/></svg></span></div>
       <div class="tile-p">
         <svg class="ic ${gl.c}${dir ? ' dir' : ''}"><use href="#${gl.s}"/></svg>
-        ${thumb ? `<img src="${x(thumb)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+        ${!thumb ? '' : TBR_CLIENT ? `<tbr-thumb src="${x(thumb)}"></tbr-thumb>`
+          : `<img src="${x(thumb)}" alt="" loading="lazy" onerror="this.remove()">`}
       </div>
       <div class="tile-b">
         <div class="tile-n">${x(it.name)}${dir ? '/' : ''}</div>
@@ -2623,8 +2664,8 @@ function signed(key, secs, filename) {
   }
   return S3.getSignedUrl('getObject', p);
 }
-function thumbURL(key) {
-  try { return signed(key, 900); } catch { return null; }
+function thumbURL(item) {
+  return (item.thumb ||= signed(item.key, SIGV4_MAX));
 }
 function isImage(name) {
   return IMG.has((name.split('.').pop() || '').toLowerCase());
